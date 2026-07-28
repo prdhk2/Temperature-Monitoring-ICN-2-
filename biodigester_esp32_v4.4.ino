@@ -1,19 +1,6 @@
 // ============================================================
 //  Biodigester Monitor — ESP32 Firmware  v4.2
 //  5 Sensor Thermocouple (TC1-TC5)
-//
-//  Changelog dari kode yang diupload:
-//    [B1] FIXED typo snprintf — missing quote pada Tmp_PrlJ1_4
-//         \"Tmp_PrlJ1_4\":\:%d\"  →  \"Tmp_PrlJ1_4\":\"%d\"
-//    [B2] FIXED ProcessHMICommand *IL00 — loop byte b<5 → b<4
-//         (ArrayToInteger union hanya 4 byte, b<5 = memory corruption)
-//    [B3] FIXED EEPROM_SIZE 20 → 24
-//         (5 sensor × 4 byte = 20 data + 4 byte CRC = 24 total)
-//    [B4] FIXED setup() — cnv_TmpTC5Lmt & varInt_TmpTC5Lmt tidak disync
-//    [B5] FIXED setup() — HMITmpTC5Lmt() tidak dipanggil
-//    [B6] FIXED syncLegacyVars() — TC5 tidak disync sama sekali
-//    [B7] FIXED Task_SensorRead — varBol_TrgOneShtTC5 tidak disync
-//    [B8] FIXED typo varIntTC5Lmt → varInt_TmpTC5Lmt
 // ============================================================
 
 #include <Adafruit_MAX31856.h>
@@ -52,7 +39,7 @@ const char* TC_JSON_KEY[NUM_TC] = {
   "Tmp_PrlJ1_1",
   "Tmp_PrlJ1_2",
   "Tmp_PrlJ1_3",
-  "Tmp_PrlJ1_4"   // ← TC5
+  "Tmp_PrlJ1_4" 
 };
 
 #define SENSOR_FAULT_VALUE  0
@@ -97,7 +84,6 @@ const unsigned long conLng_WFiTmePrdChkCnt = WIFI_RETRY_PERIOD_MS;
 
 // ============================================================
 //  KONFIGURASI EEPROM
-//  [B3] FIXED: 5*4=20 data + 4 CRC = 24
 // ============================================================
 #define EEPROM_SIZE          24    // [B3] was 20
 #define EEPROM_CRC_ADDR      20    // [B3] was 16
@@ -348,12 +334,12 @@ ArrayToInteger* cnvLmt[NUM_TC] = {
 // Legacy variables
 int  varInt_TmpTC1, varInt_TmpTC2, varInt_TmpTC3, varInt_TmpTC4, varInt_TmpTC5;
 int  varInt_TmpTC1Lmt, varInt_TmpTC2Lmt, varInt_TmpTC3Lmt,
-     varInt_TmpTC4Lmt, varInt_TmpTC5Lmt;                    // [B8] FIXED typo
+     varInt_TmpTC4Lmt, varInt_TmpTC5Lmt;
 bool varBol_TmpTC1, varBol_TmpTC2, varBol_TmpTC3, varBol_TmpTC4, varBol_TmpTC5;
 bool varBol_TmpTC1Lmt, varBol_TmpTC2Lmt, varBol_TmpTC3Lmt,
      varBol_TmpTC4Lmt, varBol_TmpTC5Lmt;
 bool varBol_TrgOneShtTC1, varBol_TrgOneShtTC2, varBol_TrgOneShtTC3,
-     varBol_TrgOneShtTC4, varBol_TrgOneShtTC5;              // [B7] FIXED nama
+     varBol_TrgOneShtTC4, varBol_TrgOneShtTC5;
 bool varBol_TmpTCn    = false;
 bool varBol_TmpTCnLmt = false;
 int  varInt_TmpTC1OvH = 100;
@@ -459,20 +445,17 @@ void setup() {
     EEPROMWR_();
   }
 
-  // Sync semua sensor limit — [B4] FIXED: TC5 sekarang disync
   for (int i = 0; i < NUM_TC; i++) sensors[i].limitValue = cnvLmt[i]->varInt_Dta;
   cnv_TmpTC1Lmt.varInt_Dta = cnvLmt[0]->varInt_Dta;
   cnv_TmpTC2Lmt.varInt_Dta = cnvLmt[1]->varInt_Dta;
   cnv_TmpTC3Lmt.varInt_Dta = cnvLmt[2]->varInt_Dta;
   cnv_TmpTC4Lmt.varInt_Dta = cnvLmt[3]->varInt_Dta;
-  cnv_TmpTC5Lmt.varInt_Dta = cnvLmt[4]->varInt_Dta;   // [B4] FIXED: was missing
+  cnv_TmpTC5Lmt.varInt_Dta = cnvLmt[4]->varInt_Dta;
   varInt_TmpTC1Lmt = cnvLmt[0]->varInt_Dta;
   varInt_TmpTC2Lmt = cnvLmt[1]->varInt_Dta;
   varInt_TmpTC3Lmt = cnvLmt[2]->varInt_Dta;
   varInt_TmpTC4Lmt = cnvLmt[3]->varInt_Dta;
-  varInt_TmpTC5Lmt = cnvLmt[4]->varInt_Dta;            // [B4] FIXED: was missing
-
-  // [B5] FIXED: HMITmpTC5Lmt() sekarang dipanggil
+  varInt_TmpTC5Lmt = cnvLmt[4]->varInt_Dta;    
   HMITmpTC1Lmt(); HMITmpTC2Lmt(); HMITmpTC3Lmt();
   HMITmpTC4Lmt(); HMITmpTC5Lmt();
 
@@ -494,7 +477,7 @@ void setup() {
 }
 
 // ============================================================
-//  LOOP UTAMA — tidak ada delay()
+//  LOOP UTAMA
 // ============================================================
 void loop() {
   unsigned long now = millis();
@@ -626,12 +609,11 @@ void Task_SensorRead(unsigned long now) {
     }
   }
 
-  // [B7] FIXED: TC5 sekarang disync
   varBol_TrgOneShtTC1 = (sensors[0].state != TC_IDLE);
   varBol_TrgOneShtTC2 = (sensors[1].state != TC_IDLE);
   varBol_TrgOneShtTC3 = (sensors[2].state != TC_IDLE);
   varBol_TrgOneShtTC4 = (sensors[3].state != TC_IDLE);
-  varBol_TrgOneShtTC5 = (sensors[4].state != TC_IDLE);  // [B7] FIXED: was missing
+  varBol_TrgOneShtTC5 = (sensors[4].state != TC_IDLE);
 }
 
 // ============================================================
@@ -719,8 +701,7 @@ void Wifi_Handle() {
 }
 
 // ============================================================
-//  HTTP SEND — enqueue saja, POST di Core 0
-//  [B1] FIXED: quote benar pada Tmp_PrlJ1_4
+//  HTTP SEND
 // ============================================================
 void Wifi_SendData() {
   varLng_DbsTmeStrTmpVal = varLng_DbsTmeCrnTmpVal;
@@ -739,13 +720,13 @@ void Wifi_SendData() {
   HttpPayload payload;
   snprintf(payload.json, sizeof(payload.json),
     "{"
-      "\"Tmp_IcnJ1\":\"0\","       // Tidak terpasang, kirim 0 (required server)
-      "\"Tmp_DctJ1\":\"0\","       // Tidak terpasang, kirim 0 (required server)
-      "\"Tmp_CmbJ1\":\"%d\","      // TC1
-      "\"Tmp_PrlJ1_1\":\"%d\","    // TC2
-      "\"Tmp_PrlJ1_2\":\"%d\","    // TC3
-      "\"Tmp_PrlJ1_3\":\"%d\","    // TC4
-      "\"Tmp_PrlJ1_4\":\"%d\""     // TC5 [B1] FIXED: was \:%d — missing quote
+      "\"Tmp_IcnJ1\":\"0\","      
+      "\"Tmp_DctJ1\":\"0\","      
+      "\"Tmp_CmbJ1\":\"%d\","     
+      "\"Tmp_PrlJ1_1\":\"%d\","   
+      "\"Tmp_PrlJ1_2\":\"%d\","   
+      "\"Tmp_PrlJ1_3\":\"%d\","   
+      "\"Tmp_PrlJ1_4\":\"%d\""    
     "}",
     getSensorVal(0),
     getSensorVal(1),
@@ -763,7 +744,6 @@ void Wifi_SendData() {
 
 // ============================================================
 //  PROSES COMMAND HMI
-//  [B2] FIXED: loop byte b < 4 (bukan b < 5, union hanya 4 byte)
 // ============================================================
 void ProcessHMICommand() {
   const String& cmd = varStr_SrlRcvCmdP1_HMI;
@@ -791,7 +771,7 @@ void ProcessHMICommand() {
   else if (cmd.substring(0,5) == "*IL00") {
     char d[2];
     for (int s = 0; s < NUM_TC; s++) {
-      for (int b = 0; b < 4; b++) {   // [B2] FIXED: was b < 5, union = 4 byte
+      for (int b = 0; b < 4; b++) {
         int pos = 5 + s*4 + b;
         cmd.substring(pos, pos+1).toCharArray(d, 2);
         cnvLmt[s]->varAry_Dta[b] = d[0];
@@ -891,24 +871,23 @@ void ProcessLFSData() {
 
 // ============================================================
 //  SYNC LEGACY VARIABLES
-//  [B6] FIXED: TC5 sekarang disync
 // ============================================================
 void syncLegacyVars() {
   varInt_TmpTC1    = sensors[0].isFault ? 0 : sensors[0].filteredValue;
   varInt_TmpTC2    = sensors[1].isFault ? 0 : sensors[1].filteredValue;
   varInt_TmpTC3    = sensors[2].isFault ? 0 : sensors[2].filteredValue;
   varInt_TmpTC4    = sensors[3].isFault ? 0 : sensors[3].filteredValue;
-  varInt_TmpTC5    = sensors[4].isFault ? 0 : sensors[4].filteredValue;  // [B6] FIXED
+  varInt_TmpTC5    = sensors[4].isFault ? 0 : sensors[4].filteredValue; 
   varBol_TmpTC1Lmt = sensors[0].limitFlag;
   varBol_TmpTC2Lmt = sensors[1].limitFlag;
   varBol_TmpTC3Lmt = sensors[2].limitFlag;
   varBol_TmpTC4Lmt = sensors[3].limitFlag;
-  varBol_TmpTC5Lmt = sensors[4].limitFlag;                               // [B6] FIXED
+  varBol_TmpTC5Lmt = sensors[4].limitFlag;                            
   varInt_TmpTC1Lmt = sensors[0].limitValue;
   varInt_TmpTC2Lmt = sensors[1].limitValue;
   varInt_TmpTC3Lmt = sensors[2].limitValue;
   varInt_TmpTC4Lmt = sensors[3].limitValue;
-  varInt_TmpTC5Lmt = sensors[4].limitValue;                              // [B6] FIXED
+  varInt_TmpTC5Lmt = sensors[4].limitValue;                      
 }
 
 // ============================================================
@@ -939,7 +918,7 @@ void HMITmpTC1Lmt() { _HMISendLimit(0); }
 void HMITmpTC2Lmt() { _HMISendLimit(1); }
 void HMITmpTC3Lmt() { _HMISendLimit(2); }
 void HMITmpTC4Lmt() { _HMISendLimit(3); }
-void HMITmpTC5Lmt() { _HMISendLimit(4); }  // [B5] FIXED: fungsi ada dan dipanggil
+void HMITmpTC5Lmt() { _HMISendLimit(4); }
 
 // ============================================================
 //  EEPROM CRC32
@@ -955,18 +934,18 @@ uint32_t CRC32_Calculate(uint8_t* d, size_t len) {
 }
 
 bool EEPROM_ValidateCRC() {
-  uint8_t raw[20];                                        // [B3] FIXED: 5*4=20
+  uint8_t raw[20];                                    
   for (int i = 0; i < 20; i++) raw[i] = EEPROM.read(i);
   uint32_t stored = 0;
   for (int i = 0; i < 4; i++)
     stored |= (uint32_t)EEPROM.read(EEPROM_CRC_ADDR+i) << (i*8);
-  return stored == CRC32_Calculate(raw, 20);              // [B3] FIXED: len=20
+  return stored == CRC32_Calculate(raw, 20);             
 }
 
 void EEPROM_WriteCRC() {
-  uint8_t raw[20];                                        // [B3] FIXED: 5*4=20
+  uint8_t raw[20];                                   
   for (int i = 0; i < 20; i++) raw[i] = EEPROM.read(i);
-  uint32_t crc = CRC32_Calculate(raw, 20);               // [B3] FIXED: len=20
+  uint32_t crc = CRC32_Calculate(raw, 20);           
   for (int i = 0; i < 4; i++)
     EEPROM.write(EEPROM_CRC_ADDR+i, (crc >> (i*8)) & 0xFF);
 }

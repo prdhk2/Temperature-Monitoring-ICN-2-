@@ -27,6 +27,7 @@ namespace {
 
 constexpr size_t MAX_LINES_PER_BATCH = 8;  // 8 x 128 chars fits MQTT_PACKET_SIZE
 constexpr uint16_t KEEPALIVE_S = 30;       // survives the pauses inside an OTA download
+constexpr uint16_t SOCKET_TIMEOUT_S = 4;    // wait for CONNACK / packet bytes (busy-wait in PubSubClient)
 constexpr size_t CMD_BUFFER_SIZE = 512;    // OTA command: ~150-char URL + 64-char hash + keys
 
 char statusTopic[64];
@@ -230,6 +231,11 @@ void mqttTask(void *) {
   client.setServer(Config::MQTT_BROKER_HOST, Config::MQTT_BROKER_PORT);
   client.setBufferSize(Config::MQTT_PACKET_SIZE);
   client.setKeepAlive(KEEPALIVE_S);
+  // [FIX] PubSubClient::connect() menunggu CONNACK dengan busy-loop TANPA
+  // yield selama socketTimeout (default 15 s). Kalau broker lambat/tidak
+  // menjawab, IDLE0 kelaparan > 5 s -> task watchdog -> reboot berulang.
+  // Timeout dipendekkan, dan task berjalan di prioritas idle (lihat beginMqtt).
+  client.setSocketTimeout(SOCKET_TIMEOUT_S);
   activeClient = &client;
 
   client.setCallback([](char *topic, uint8_t *data, unsigned int length) {
@@ -316,7 +322,12 @@ void beginMqtt() {
     return;
   }
   // TLS + PubSubClient + the OTA download (HTTPClient over TLS) on one task.
-  BaseType_t created = xTaskCreatePinnedToCore(mqttTask, "mqtt", 12288, nullptr, 1, nullptr, 0);
+  // [FIX] Prioritas = idle (0): busy-wait di dalam PubSubClient/WiFiClientSecure
+  // tidak lagi bisa membuat IDLE0 kelaparan (FreeRTOS time-slicing antar task
+  // berprioritas sama), jadi task watchdog tidak me-reset board. Task Wi-Fi/
+  // lwIP sistem tetap di atasnya, dan loop() ada di core 1.
+  BaseType_t created =
+      xTaskCreatePinnedToCore(mqttTask, "mqtt", 12288, nullptr, tskIDLE_PRIORITY, nullptr, 0);
   if (created != pdPASS) logf("[MQTT] could not start the MQTT task (out of memory)");
 }
 

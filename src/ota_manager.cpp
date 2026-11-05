@@ -301,7 +301,8 @@ void checkBootRollback() {
   Preferences prefs;
   if (!prefs.begin(NVS_NAMESPACE, false)) return;
 
-  String trialLabel = prefs.getString(KEY_TRIAL_PART, "");
+  // isKey() dulu: getString() pada key yang belum ada mencetak error NVS di serial.
+  String trialLabel = prefs.isKey(KEY_TRIAL_PART) ? prefs.getString(KEY_TRIAL_PART, "") : String();
   bool isTrial = trialLabel.length() > 0 && trialLabel == running->label;
 
   if (!isTrial) {
@@ -317,7 +318,8 @@ void checkBootRollback() {
   boots = boots < 255 ? static_cast<uint8_t>(boots + 1) : 255;
   prefs.putUChar(KEY_TRIAL_BOOTS, boots);
 
-  String goodLabel = prefs.getString(KEY_GOOD_PART, "");
+  // isKey() dulu: getString() pada key yang belum ada mencetak error NVS di serial.
+  String goodLabel = prefs.isKey(KEY_GOOD_PART) ? prefs.getString(KEY_GOOD_PART, "") : String();
   const esp_partition_t *target = nullptr;
   if (goodLabel.length() > 0 && goodLabel != running->label) {
     target = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY,
@@ -358,7 +360,8 @@ void confirmBootHealthy() {
   if (!prefs.begin(NVS_NAMESPACE, false)) return;
   // Written only when something changes: this runs once every boot, and
   // NVS writes wear flash.
-  if (prefs.getString(KEY_GOOD_PART, "") != running->label) prefs.putString(KEY_GOOD_PART, running->label);
+  String good = prefs.isKey(KEY_GOOD_PART) ? prefs.getString(KEY_GOOD_PART, "") : String();
+  if (good != running->label) prefs.putString(KEY_GOOD_PART, running->label);
   if (prefs.isKey(KEY_TRIAL_PART)) prefs.remove(KEY_TRIAL_PART);
   if (prefs.getUChar(KEY_TRIAL_BOOTS, 0) != 0) prefs.putUChar(KEY_TRIAL_BOOTS, 0);
   prefs.end();

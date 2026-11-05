@@ -1,13 +1,3 @@
-// ============================================================
-//  ICN-2 Temperature Monitor - ESP32 firmware (PlatformIO)
-//  5 thermocouple MAX31856 (TC1-TC5), HMI Nextion, panel relay/reject,
-//  LFS flow meter, upload ke monitoring.xampah.com, fleet MQTT + OTA.
-//
-//  Dari sketch biodigester_esp32_v4.4.ino. PIN, protokol serial (HMI, panel,
-//  LFS) dan layout EEPROM TIDAK berubah. Perbaikan bug ditandai [FIX].
-//  Jaringan/fleet ada di include/config.h dan src/mqtt_client.cpp.
-// ============================================================
-
 #include <Arduino.h>
 #include <Adafruit_MAX31856.h>
 #include <EEPROM.h>
@@ -496,9 +486,12 @@ void setup() {
   // [FIX] Lampu WiFi di panel bisa tertinggal ON dari sebelum reset.
   rjcSend("*O000");
 
+  // Task upload di prioritas idle (sama seperti task MQTT): penantian TLS/HTTP
+  // tidak boleh membuat IDLE0 kelaparan (task watchdog).
   httpQueue = xQueueCreate(4, sizeof(HttpPayload));
   if (!httpQueue ||
-      xTaskCreatePinnedToCore(Task_HttpPost, "HttpPostTask", 10240, nullptr, 1, nullptr, 0) != pdPASS) {
+      xTaskCreatePinnedToCore(Task_HttpPost, "HttpPostTask", 10240, nullptr, tskIDLE_PRIORITY, nullptr,
+                              0) != pdPASS) {
     logf("[INIT] upload task could not start (out of memory) - uploads disabled");
   }
   if (!Config::apiKeyConfigured()) logf("[INIT] DP_API_KEY not set - the server will answer 401");
